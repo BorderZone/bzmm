@@ -36,7 +36,7 @@ async fn find_mod_dir(
     let hash_result = hasher.finalize();
     let repo_hash = format!("{:x}", hash_result);
     let repo_hash = &repo_hash[..6]; // Shrink the hash to 6 characters
-    let xml_specific_path = base_downloads_dir.join(&repo_hash);
+    let xml_specific_path = base_downloads_dir.join(repo_hash);
     let mod_path_in_xml_dir = xml_specific_path.join(mod_name);
 
     println!("Searching for mod '{}' in specific path: {}", mod_name, mod_path_in_xml_dir.display());
@@ -210,7 +210,7 @@ pub async fn delete_mod(mod_name: String, profile_name: String) -> Result<ModRes
             // Disable the mod first
             disable_mod(mod_name.clone(), profile_name.clone())
                 .await
-                .map_err(|e| ModError::EnablementError(e))?;
+                .map_err(ModError::EnablementError)?;
         }
 
         // Delete the mod directory
@@ -254,26 +254,21 @@ pub async fn update_mod(
         let mod_dir = find_mod_dir(&settings, &mod_name, &profile_name).await?;
 
         // Check if mod is enabled for the current profile
-        let was_enabled = matches!(
-            fs::metadata(get_enabled_file_path(&mod_dir, &profile_name)).await,
-            Ok(_)
-        );
+        let was_enabled =
+            fs::metadata(get_enabled_file_path(&mod_dir, &profile_name)).await.is_ok();
 
         // If mod is being enabled, error out
-        if matches!(
-            fs::metadata(get_enabling_file_path(&mod_dir, &profile_name)).await,
-            Ok(_)
-        ) {
-            return Err(ModError::EnablementError(
+        fs::metadata(get_enabling_file_path(&mod_dir, &profile_name)).await.map_err(|_|
+            ModError::EnablementError(
                 "Cannot update mod while it is being enabled".to_string(),
-            ));
-        }
+            )
+        )?;
 
         // If enabled, disable first
         if was_enabled {
             disable_mod(mod_name.clone(), profile_name.clone())
                 .await
-                .map_err(|e| ModError::EnablementError(e))?;
+                .map_err(ModError::EnablementError)?;
         }
 
         // Find the profile to get the repo_url for the download
@@ -297,7 +292,7 @@ pub async fn update_mod(
                 if was_enabled {
                     enable_mod(mod_name.clone(), profile_name)
                         .await
-                        .map_err(|e| ModError::EnablementError(e))?;
+                        .map_err(ModError::EnablementError)?;
                 }
 
                 Ok(ModResult {

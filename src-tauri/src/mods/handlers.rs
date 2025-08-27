@@ -29,7 +29,7 @@ pub async fn get_enabled_mods(profile_name: String) -> Result<Vec<String>, Strin
     let repo_hash = format!("{:x}", hash_result);
     // Shrink the hash to 6 characters
     let repo_hash = &repo_hash[..6];
-    let xml_specific_path = base_downloads_dir.join(&repo_hash);
+    let xml_specific_path = base_downloads_dir.join(repo_hash);
 
     println!("Checking for enabled mods within: {}", xml_specific_path.display());
 
@@ -179,7 +179,7 @@ pub async fn get_mods(profile_index: usize) -> Result<ModsResult, String> {
         let hash_result = hasher.finalize();
         let repo_hash = format!("{:x}", hash_result);
         let repo_hash = &repo_hash[..6]; // Shrink the hash to 6 characters
-        let xml_specific_path = base_downloads_dir.join(&repo_hash);
+        let xml_specific_path = base_downloads_dir.join(repo_hash);
 
         match scan_for_deprecated_mods(&xml_specific_path, &active_mod_names) {
             Ok(deprecated_category) => {

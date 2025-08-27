@@ -61,7 +61,7 @@ pub async fn download_mod(
     let hash_result = hasher.finalize();
     let repo_hash = format!("{:x}", hash_result);
     let repo_hash = &repo_hash[..6]; // Shrink the hash to 6 characters
-    let xml_specific_path = base_downloads_dir.join(&repo_hash);
+    let xml_specific_path = base_downloads_dir.join(repo_hash);
 
     // Create the XML-specific directory if it doesn't exist
     if !xml_specific_path.exists() {
@@ -219,10 +219,8 @@ pub async fn download_mod(
     // ZIP files should start with "PK\x03\x04"
     if buffer != [0x50, 0x4B, 0x03, 0x04] {
         // Not a valid ZIP - could be an HTML error page
-        let content = match std::fs::read_to_string(&file_path) {
-            Ok(c) => c,
-            Err(_) => "<binary content>".to_string(),
-        };
+        let content = std::fs::read_to_string(&file_path)
+            .unwrap_or_else(|_| "<binary content>".to_string());
 
         println!(
             "Invalid ZIP header: {:?} - Content starts with: {}",
@@ -231,10 +229,9 @@ pub async fn download_mod(
         );
         
         // Emit an error event
-        let error_message = format!(
-            "Downloaded file is not a valid ZIP archive. File might be corrupted."
-        );
-        
+        let error_message =
+            "Downloaded file is not a valid ZIP archive. File might be corrupted.".to_string();
+
         // Emit an error event to the frontend
         let _ = app_handle.emit(
             "download-error",
@@ -311,7 +308,7 @@ pub async fn download_mod_with_cancellation(
     let hash_result = hasher.finalize();
     let repo_hash = format!("{:x}", hash_result);
     let repo_hash = &repo_hash[..6]; // Shrink the hash to 6 characters
-    let xml_specific_path = base_downloads_dir.join(&repo_hash);
+    let xml_specific_path = base_downloads_dir.join(repo_hash);
 
     // Create the XML-specific directory if it doesn't exist
     if !xml_specific_path.exists() {
@@ -481,10 +478,8 @@ pub async fn download_mod_with_cancellation(
 
     // ZIP files should start with "PK\x03\x04"
     if buffer != [0x50, 0x4B, 0x03, 0x04] {
-        let content = match std::fs::read_to_string(&file_path) {
-            Ok(c) => c,
-            Err(_) => "<binary content>".to_string(),
-        };
+        let content = std::fs::read_to_string(&file_path)
+            .unwrap_or_else(|_| "<binary content>".to_string());
 
         println!(
             "Invalid ZIP header: {:?} - Content starts with: {}",
@@ -492,10 +487,9 @@ pub async fn download_mod_with_cancellation(
             content.chars().take(100).collect::<String>()
         );
         
-        let error_message = format!(
-            "Downloaded file is not a valid ZIP archive. File might be corrupted."
-        );
-        
+        let error_message =
+            "Downloaded file is not a valid ZIP archive. File might be corrupted.".to_string();
+
         let _ = app_handle.emit(
             "download-error",
             serde_json::json!({

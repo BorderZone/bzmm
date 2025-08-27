@@ -35,7 +35,7 @@ fn verify_archive(archive: &mut ZipArchive<fs::File>) -> Result<(), String> {
 
         // For large files, just read the start to verify the CRC
         let mut buffer = [0u8; 4096];
-        match file.read(&mut buffer) {
+        match file.read_exact(&mut buffer) {
             Ok(_) => {} // Successfully read some data
             Err(e) => return Err(format!("Failed to read file '{}': {}", file.name(), e)),
         }
