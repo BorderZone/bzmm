@@ -219,10 +219,8 @@ pub async fn download_mod(
     // ZIP files should start with "PK\x03\x04"
     if buffer != [0x50, 0x4B, 0x03, 0x04] {
         // Not a valid ZIP - could be an HTML error page
-        let content = match std::fs::read_to_string(&file_path) {
-            Ok(c) => c,
-            Err(_) => "<binary content>".to_string(),
-        };
+        let content = std::fs::read_to_string(&file_path)
+            .map_or_else(|_| "<binary content>".to_string(), |c| c);
 
         println!(
             "Invalid ZIP header: {:?} - Content starts with: {}",
@@ -480,10 +478,8 @@ pub async fn download_mod_with_cancellation(
 
     // ZIP files should start with "PK\x03\x04"
     if buffer != [0x50, 0x4B, 0x03, 0x04] {
-        let content = match std::fs::read_to_string(&file_path) {
-            Ok(c) => c,
-            Err(_) => "<binary content>".to_string(),
-        };
+        let content = std::fs::read_to_string(&file_path)
+            .map_or_else(|_| "<binary content>".to_string(), |c| c);
 
         println!(
             "Invalid ZIP header: {:?} - Content starts with: {}",
@@ -491,9 +487,9 @@ pub async fn download_mod_with_cancellation(
             content.chars().take(100).collect::<String>()
         );
         
-        let error_message = 
+        let error_message =
             "Downloaded file is not a valid ZIP archive. File might be corrupted.".to_string();
-        
+
         let _ = app_handle.emit(
             "download-error",
             serde_json::json!({
