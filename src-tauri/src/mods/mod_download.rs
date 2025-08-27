@@ -231,10 +231,9 @@ pub async fn download_mod(
         );
         
         // Emit an error event
-        let error_message = format!(
-            "Downloaded file is not a valid ZIP archive. File might be corrupted."
-        );
-        
+        let error_message =
+            "Downloaded file is not a valid ZIP archive. File might be corrupted.".to_string();
+
         // Emit an error event to the frontend
         let _ = app_handle.emit(
             "download-error",
@@ -492,9 +491,8 @@ pub async fn download_mod_with_cancellation(
             content.chars().take(100).collect::<String>()
         );
         
-        let error_message = format!(
-            "Downloaded file is not a valid ZIP archive. File might be corrupted."
-        );
+        let error_message = 
+            "Downloaded file is not a valid ZIP archive. File might be corrupted.".to_string();
         
         let _ = app_handle.emit(
             "download-error",

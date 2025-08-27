@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 pub mod downloader;
 pub mod download_queue;
 pub mod extraction;
