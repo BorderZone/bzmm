@@ -92,7 +92,7 @@ impl DownloadQueue {
         use crate::settings;
         use std::path::PathBuf;
 
-        let settings = settings::Settings::load().map_err(|e| e.to_string())?;
+        let settings = settings::Settings::load()?;
         let base_downloads_dir = PathBuf::from(&settings.download_path);
         
         // Try to find and remove any temporary files matching this filename
