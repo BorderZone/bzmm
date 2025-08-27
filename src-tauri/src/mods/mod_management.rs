@@ -254,20 +254,15 @@ pub async fn update_mod(
         let mod_dir = find_mod_dir(&settings, &mod_name, &profile_name).await?;
 
         // Check if mod is enabled for the current profile
-        let was_enabled = matches!(
-            fs::metadata(get_enabled_file_path(&mod_dir, &profile_name)).await,
-            Ok(_)
-        );
+        let was_enabled =
+            fs::metadata(get_enabled_file_path(&mod_dir, &profile_name)).await.is_ok();
 
         // If mod is being enabled, error out
-        if matches!(
-            fs::metadata(get_enabling_file_path(&mod_dir, &profile_name)).await,
-            Ok(_)
-        ) {
-            return Err(ModError::EnablementError(
+        fs::metadata(get_enabling_file_path(&mod_dir, &profile_name)).await.map_err(|_|
+            ModError::EnablementError(
                 "Cannot update mod while it is being enabled".to_string(),
-            ));
-        }
+            )
+        )?;
 
         // If enabled, disable first
         if was_enabled {
