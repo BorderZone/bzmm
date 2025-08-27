@@ -177,7 +177,7 @@ impl DownloadQueue {
 static DOWNLOAD_QUEUE: std::sync::OnceLock<DownloadQueue> = std::sync::OnceLock::new();
 
 pub fn get_queue() -> &'static DownloadQueue {
-    DOWNLOAD_QUEUE.get_or_init(|| DownloadQueue::new())
+    DOWNLOAD_QUEUE.get_or_init(DownloadQueue::new)
 }
 
 #[tauri::command]

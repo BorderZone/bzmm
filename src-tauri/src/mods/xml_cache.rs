@@ -44,7 +44,7 @@ impl XmlCache {
         let file_path = cache_dir.join(&filename);
         
         fs::write(&file_path, xml_content)
-            .map_err(|e| ModError::IoError(e))?;
+            .map_err(ModError::IoError)?;
         
         println!("Saved XML cache to {}", file_path.display());
         Ok(file_path)
@@ -60,7 +60,7 @@ impl XmlCache {
         }
         
         let xml_content = fs::read_to_string(path)
-            .map_err(|e| ModError::IoError(e))?;
+            .map_err(ModError::IoError)?;
         
         ModParser::parse_mod_list(&xml_content)
     }

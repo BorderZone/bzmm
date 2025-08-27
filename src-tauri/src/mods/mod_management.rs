@@ -210,7 +210,7 @@ pub async fn delete_mod(mod_name: String, profile_name: String) -> Result<ModRes
             // Disable the mod first
             disable_mod(mod_name.clone(), profile_name.clone())
                 .await
-                .map_err(|e| ModError::EnablementError(e))?;
+                .map_err(ModError::EnablementError)?;
         }
 
         // Delete the mod directory
@@ -273,7 +273,7 @@ pub async fn update_mod(
         if was_enabled {
             disable_mod(mod_name.clone(), profile_name.clone())
                 .await
-                .map_err(|e| ModError::EnablementError(e))?;
+                .map_err(ModError::EnablementError)?;
         }
 
         // Find the profile to get the repo_url for the download
@@ -297,7 +297,7 @@ pub async fn update_mod(
                 if was_enabled {
                     enable_mod(mod_name.clone(), profile_name)
                         .await
-                        .map_err(|e| ModError::EnablementError(e))?;
+                        .map_err(ModError::EnablementError)?;
                 }
 
                 Ok(ModResult {
