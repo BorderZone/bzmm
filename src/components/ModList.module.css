@@ -1,0 +1,24 @@
+.modCard {
+  transition: all 0.3s ease-in-out;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.modCardExit {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+
+.modCardEnter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.modCardEnterActive {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.modList {
+  position: relative;
+}
