@@ -220,7 +220,7 @@ pub async fn download_mod(
     if buffer != [0x50, 0x4B, 0x03, 0x04] {
         // Not a valid ZIP - could be an HTML error page
         let content = std::fs::read_to_string(&file_path)
-            .map_or_else(|_| "<binary content>".to_string(), |c| c);
+            .unwrap_or_else(|_| "<binary content>".to_string());
 
         println!(
             "Invalid ZIP header: {:?} - Content starts with: {}",
@@ -479,7 +479,7 @@ pub async fn download_mod_with_cancellation(
     // ZIP files should start with "PK\x03\x04"
     if buffer != [0x50, 0x4B, 0x03, 0x04] {
         let content = std::fs::read_to_string(&file_path)
-            .map_or_else(|_| "<binary content>".to_string(), |c| c);
+            .unwrap_or_else(|_| "<binary content>".to_string());
 
         println!(
             "Invalid ZIP header: {:?} - Content starts with: {}",
