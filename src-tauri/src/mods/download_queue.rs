@@ -50,7 +50,9 @@ impl DownloadQueue {
         });
     }
 
+    #[allow(dead_code)]
     pub async fn cancel_download(&self, filename: &str) -> Result<(), String> {
+        #[allow(unused_assignments)] // False positive
         let mut was_queued = false;
         let mut was_downloading = false;
 
@@ -88,6 +90,7 @@ impl DownloadQueue {
         Ok(())
     }
 
+    #[allow(dead_code)]
     async fn cleanup_download_files(&self, filename: &str) -> Result<(), String> {
         use crate::settings;
         use std::path::PathBuf;
@@ -195,6 +198,7 @@ pub async fn queue_download(
     Ok(())
 }
 
+#[allow(dead_code)]
 #[tauri::command]
 pub async fn cancel_download(
     app_handle: tauri::AppHandle,
