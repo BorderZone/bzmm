@@ -29,3 +29,6 @@ tauri-plugin-updater = "2.3.1"
 semver = "1.0.24"
 sha2 = "0.10.8"                                                      # Added for hashing repo URLs
 tokio-util = "0.7.15"
+
+[dev-dependencies]
+tempfile = "3.21.0"
