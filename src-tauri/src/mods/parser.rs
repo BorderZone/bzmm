@@ -26,7 +26,7 @@ impl ModParser {
         let hash_result = hasher.finalize();
         let repo_hash = format!("{:x}", hash_result);
         let repo_hash = &repo_hash[..6]; // Shrink the hash to 6 characters
-        let xml_specific_path = base_download_path.join(&repo_hash);
+        let xml_specific_path = base_download_path.join(repo_hash);
 
         println!("Checking for updates within: {}", xml_specific_path.display());
 

@@ -61,7 +61,7 @@ pub async fn download_mod(
     let hash_result = hasher.finalize();
     let repo_hash = format!("{:x}", hash_result);
     let repo_hash = &repo_hash[..6]; // Shrink the hash to 6 characters
-    let xml_specific_path = base_downloads_dir.join(&repo_hash);
+    let xml_specific_path = base_downloads_dir.join(repo_hash);
 
     // Create the XML-specific directory if it doesn't exist
     if !xml_specific_path.exists() {
@@ -311,7 +311,7 @@ pub async fn download_mod_with_cancellation(
     let hash_result = hasher.finalize();
     let repo_hash = format!("{:x}", hash_result);
     let repo_hash = &repo_hash[..6]; // Shrink the hash to 6 characters
-    let xml_specific_path = base_downloads_dir.join(&repo_hash);
+    let xml_specific_path = base_downloads_dir.join(repo_hash);
 
     // Create the XML-specific directory if it doesn't exist
     if !xml_specific_path.exists() {

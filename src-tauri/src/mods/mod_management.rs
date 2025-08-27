@@ -36,7 +36,7 @@ async fn find_mod_dir(
     let hash_result = hasher.finalize();
     let repo_hash = format!("{:x}", hash_result);
     let repo_hash = &repo_hash[..6]; // Shrink the hash to 6 characters
-    let xml_specific_path = base_downloads_dir.join(&repo_hash);
+    let xml_specific_path = base_downloads_dir.join(repo_hash);
     let mod_path_in_xml_dir = xml_specific_path.join(mod_name);
 
     println!("Searching for mod '{}' in specific path: {}", mod_name, mod_path_in_xml_dir.display());
