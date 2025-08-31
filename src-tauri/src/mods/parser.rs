@@ -71,8 +71,7 @@ impl ModParser {
 mod tests {
     use super::*;
     use tempfile::tempdir;
-    use super::types::{Category, Mod};
-    use std::path::PathBuf;
+    use crate::mods::types::{Category, Mod};
 
     // Helper to create a dummy repo hash for testing
     fn get_test_repo_hash(url: &str) -> String {
@@ -80,7 +79,7 @@ mod tests {
         hasher.update(url.as_bytes());
         let repo_hash = format!("{:x}", hasher.finalize());
         let repo_hash = &repo_hash[..6]; // Shrink the hash to 6 characters
-        format!("{:x}", repo_hash)
+        repo_hash.to_string()
     }
 
     #[test]
@@ -104,6 +103,7 @@ mod tests {
         assert_eq!(mods.categories[0].mods[0].name, "Test Mod");
     }
 
+    #[test]
     fn test_check_for_updates() {
         let base_temp_dir = tempdir().unwrap();
         let repo_url = "http://example.com/repo.xml";
