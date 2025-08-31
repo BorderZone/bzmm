@@ -50,7 +50,9 @@ impl DownloadQueue {
         });
     }
 
+    #[allow(dead_code)]
     pub async fn cancel_download(&self, filename: &str) -> Result<(), String> {
+        #[allow(unused_assignments)] // False positive
         let mut was_queued = false;
         let mut was_downloading = false;
 
@@ -88,11 +90,12 @@ impl DownloadQueue {
         Ok(())
     }
 
+    #[allow(dead_code)]
     async fn cleanup_download_files(&self, filename: &str) -> Result<(), String> {
         use crate::settings;
         use std::path::PathBuf;
 
-        let settings = settings::Settings::load().map_err(|e| e.to_string())?;
+        let settings = settings::Settings::load()?;
         let base_downloads_dir = PathBuf::from(&settings.download_path);
         
         // Try to find and remove any temporary files matching this filename
@@ -177,7 +180,7 @@ impl DownloadQueue {
 static DOWNLOAD_QUEUE: std::sync::OnceLock<DownloadQueue> = std::sync::OnceLock::new();
 
 pub fn get_queue() -> &'static DownloadQueue {
-    DOWNLOAD_QUEUE.get_or_init(|| DownloadQueue::new())
+    DOWNLOAD_QUEUE.get_or_init(DownloadQueue::new)
 }
 
 #[tauri::command]
@@ -195,6 +198,7 @@ pub async fn queue_download(
     Ok(())
 }
 
+#[allow(dead_code)]
 #[tauri::command]
 pub async fn cancel_download(
     app_handle: tauri::AppHandle,
