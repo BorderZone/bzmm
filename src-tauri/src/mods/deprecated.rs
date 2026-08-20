@@ -1,11 +1,11 @@
 use super::types::{Category, Mod, ModError};
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
-use std::collections::HashSet;
 
 // Similar to sideload.rs, but for detecting deprecated mods
 pub fn read_mod_metadata(mod_dir: &Path) -> Result<Mod, ModError> {
-    println!("Reading metadata for deprecated mod: {:?}", mod_dir);
+    tracing::info!(mod_ = ?mod_dir, "Reading data for deprecated ");
     let name = mod_dir
         .file_name()
         .and_then(|n| n.to_str())
@@ -24,7 +24,7 @@ pub fn read_mod_metadata(mod_dir: &Path) -> Result<Mod, ModError> {
         .trim()
         .to_string();
 
-    println!("Found deprecated mod: {} ({})", name, version);
+    tracing::info!(name, version, "Found deprecated mod:");
     Ok(Mod::new_deprecated(name, version, description))
 }
 
@@ -34,12 +34,12 @@ pub fn scan_for_deprecated_mods(
     xml_specific_path: &Path,
     active_mod_names: &HashSet<String>,
 ) -> Result<Category, ModError> {
-    println!(
-        "Scanning for deprecated mods within specific path: {}",
-        xml_specific_path.display()
-    );
+    tracing::info!(specific_path = ?xml_specific_path, "Scanning for deprecated mods within");
     if !xml_specific_path.exists() || !xml_specific_path.is_dir() {
-        println!("XML-specific directory does not exist or is not a directory.");
+        tracing::info!(
+            ?xml_specific_path,
+            "XML-specific directory does not exist or is not a directory."
+        );
         // Not an error, just means no mods downloaded for this source yet.
         return Ok(Category::new_deprecated(Vec::new()));
     }
@@ -57,16 +57,22 @@ pub fn scan_for_deprecated_mods(
                 if !active_mod_names.contains(mod_name) {
                     match read_mod_metadata(&path) {
                         Ok(mod_info) => {
-                            println!("Successfully read metadata for deprecated mod: {:?}", path);
+                            tracing::info!(?path, "Successfully read metadata for deprecated mod");
                             deprecated_mods.push(mod_info);
                         }
-                        Err(e) => eprintln!("Failed to read metadata for deprecated mod {:?}: {}", path, e),
+                        Err(e) => {
+                            tracing::error!(
+                                ?path,
+                                error = ?e,
+                                "Failed to read metadata for deprecated mod"
+                            );
+                        }
                     }
                 }
             }
         }
     }
 
-    println!("Found {} deprecated mods", deprecated_mods.len());
+    tracing::info!("Found {} deprecated mods", deprecated_mods.len());
     Ok(Category::new_deprecated(deprecated_mods))
 }

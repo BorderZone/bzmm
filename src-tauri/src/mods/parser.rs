@@ -1,8 +1,8 @@
-use std::fs;
-use std::path::Path;
 use super::types::{ModError, ModsFile};
 use quick_xml::de::from_str;
 use sha2::{Digest, Sha256};
+use std::fs;
+use std::path::Path;
 
 pub struct ModParser;
 
@@ -13,6 +13,7 @@ impl ModParser {
     }
 
     /// Checks for local updates against the provided XML mod list, considering the source repository URL.
+    #[tracing::instrument(skip(xml_mods))]
     pub fn check_for_updates(
         xml_mods: &ModsFile,
         base_download_path: &Path,
@@ -26,36 +27,45 @@ impl ModParser {
         let hash_result = hasher.finalize();
         let repo_hash = format!("{:x}", hash_result);
         let repo_hash = &repo_hash[..6]; // Shrink the hash to 6 characters
-        let xml_specific_path = base_download_path.join(&repo_hash);
+        let xml_specific_path = base_download_path.join(repo_hash);
 
-        println!("Checking for updates within: {}", xml_specific_path.display());
+        tracing::info!(path = ?xml_specific_path, "Checking for updates");
 
         for category in &mut updated_mods.categories {
             for mod_entry in &mut category.mods {
-                println!("Checking updates for mod: {}", mod_entry.name);
+                //println!("Checking updates for mod: {}", mod_entry.name);
+                tracing::debug!("Checking update for mod: {}", mod_entry.name);
 
                 // Check if mod is downloaded within the XML-specific directory
                 let mod_dir = xml_specific_path.join(&mod_entry.name);
                 if !mod_dir.is_dir() {
                     // Mod not downloaded from this specific source
-                    println!("Mod dir not found in XML-specific path: {:?}", mod_dir);
+                    tracing::warn!(path = ?mod_dir, "Mod dir not found in XML-specific path");
                     continue;
                 }
 
                 // Read VERSION.txt
                 let version_path = mod_dir.join("VERSION.txt");
                 if !version_path.exists() {
-                    println!("VERSION.txt not found in {:?}", version_path);
+                    tracing::warn!(?version_path, "VERSION.txt not found");
                     continue;
                 }
 
                 if let Ok(local_version) = fs::read_to_string(version_path) {
                     let local_version = local_version.trim();
-                    println!("Local version: {}, XML version: {}", local_version, mod_entry.version);
-                    
+                    tracing::debug!(
+                        local_version,
+                        xml_version = mod_entry.version,
+                        "Found local version",
+                    );
+
                     // If XML version is different from local version, set newVersion
                     if local_version != mod_entry.version {
-                        println!("Update found! Setting new_version to {}", mod_entry.version);
+                        tracing::info!(
+                            mod_ = mod_entry.name,
+                            "Update found! Setting new version to {}",
+                            mod_entry.version
+                        );
                         mod_entry.new_version = Some(mod_entry.version.clone());
                         mod_entry.version = local_version.to_string();
                     }
@@ -70,9 +80,8 @@ impl ModParser {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mods::types::{Category, Mod};
     use tempfile::tempdir;
-    use super::types::{Category, Mod};
-    use std::path::PathBuf;
 
     // Helper to create a dummy repo hash for testing
     fn get_test_repo_hash(url: &str) -> String {
@@ -80,7 +89,7 @@ mod tests {
         hasher.update(url.as_bytes());
         let repo_hash = format!("{:x}", hasher.finalize());
         let repo_hash = &repo_hash[..6]; // Shrink the hash to 6 characters
-        format!("{:x}", repo_hash)
+        repo_hash.to_string()
     }
 
     #[test]
@@ -104,6 +113,7 @@ mod tests {
         assert_eq!(mods.categories[0].mods[0].name, "Test Mod");
     }
 
+    #[test]
     fn test_check_for_updates() {
         let base_temp_dir = tempdir().unwrap();
         let repo_url = "http://example.com/repo.xml";
@@ -125,21 +135,17 @@ mod tests {
         fs::write(other_mod_dir.join("VERSION.txt"), "0.9.0").unwrap(); // Different version
 
         let mods = ModsFile {
-            categories: vec![
-                Category {
-                    name: "Essential".to_string(),
-                    sort_order: 1,
-                    mods: vec![
-                        Mod {
-                            name: "Test Mod".to_string(),
-                            version: "1.0.1".to_string(), // XML has newer version
-                            url: Some("http://example.com/mod.zip".to_string()),
-                            new_version: None,
-                            description: "Test description".to_string(),
-                        }
-                    ],
-                }
-            ],
+            categories: vec![Category {
+                name: "Essential".to_string(),
+                sort_order: 1,
+                mods: vec![Mod {
+                    name: "Test Mod".to_string(),
+                    version: "1.0.1".to_string(), // XML has newer version
+                    url: Some("http://example.com/mod.zip".to_string()),
+                    new_version: None,
+                    description: "Test description".to_string(),
+                }],
+            }],
         };
 
         // Check against the first repo URL
@@ -151,23 +157,24 @@ mod tests {
 
         // Check against the second repo URL (should not find the mod in its specific dir)
         let mods_for_other_repo = ModsFile {
-             categories: vec![
-                Category {
-                    name: "Essential".to_string(),
-                    sort_order: 1,
-                    mods: vec![
-                        Mod {
-                            name: "Test Mod".to_string(), // Same mod name
-                            version: "1.0.0".to_string(), // XML version
-                            url: Some("http://another.com/mod.zip".to_string()),
-                            new_version: None,
-                            description: "Test description".to_string(),
-                        }
-                    ],
-                }
-            ],
+            categories: vec![Category {
+                name: "Essential".to_string(),
+                sort_order: 1,
+                mods: vec![Mod {
+                    name: "Test Mod".to_string(), // Same mod name
+                    version: "1.0.0".to_string(), // XML version
+                    url: Some("http://another.com/mod.zip".to_string()),
+                    new_version: None,
+                    description: "Test description".to_string(),
+                }],
+            }],
         };
-        let result_other = ModParser::check_for_updates(&mods_for_other_repo, base_temp_dir.path(), other_repo_url).unwrap();
+        let result_other = ModParser::check_for_updates(
+            &mods_for_other_repo,
+            base_temp_dir.path(),
+            other_repo_url,
+        )
+        .unwrap();
         let updated_mod_other = &result_other.categories[0].mods[0];
 
         // Since the local version is 0.9.0 for this repo, it should be updated

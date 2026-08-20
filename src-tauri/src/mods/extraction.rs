@@ -35,7 +35,7 @@ fn verify_archive(archive: &mut ZipArchive<fs::File>) -> Result<(), String> {
 
         // For large files, just read the start to verify the CRC
         let mut buffer = [0u8; 4096];
-        match file.read(&mut buffer) {
+        match file.read_exact(&mut buffer) {
             Ok(_) => {} // Successfully read some data
             Err(e) => return Err(format!("Failed to read file '{}': {}", file.name(), e)),
         }
@@ -50,7 +50,7 @@ pub async fn extract_zip(
     extract_dir: &Path,
     mod_name: &str,
 ) -> Result<(), String> {
-    println!(
+    tracing::info!(
         "Starting extraction of {} to {}",
         zip_path.display(),
         extract_dir.display()
@@ -98,7 +98,7 @@ pub async fn extract_zip(
         Ok(archive) => archive,
         Err(e) => {
             let error_msg = format!("The ZIP file is corrupted or invalid: {}", e);
-            println!("{}", error_msg);
+            tracing::info!("{}", error_msg);
             let _ = app_handle.emit(
                 "extraction-error",
                 ExtractionError {
@@ -114,7 +114,7 @@ pub async fn extract_zip(
     // Verify the archive is intact by checking for CRC errors
     if let Err(e) = verify_archive(&mut archive) {
         let error_msg = format!("ZIP archive failed verification: {}", e);
-        println!("{}", error_msg);
+        tracing::error!("{}", error_msg);
         let _ = app_handle.emit(
             "extraction-error",
             ExtractionError {
@@ -205,7 +205,7 @@ pub async fn extract_zip(
     }
 
     // Emit extraction completed event
-    println!("Extraction completed for {}", mod_name);
+    tracing::info!("Extraction completed for {}", mod_name);
     app_handle
         .emit(
             "extraction-status",
@@ -228,7 +228,7 @@ pub async fn extract_zip_with_cancellation(
     mod_name: &str,
     cancel_token: CancellationToken,
 ) -> Result<(), String> {
-    println!(
+    tracing::info!(
         "Starting cancellable extraction of {} to {}",
         zip_path.display(),
         extract_dir.display()
@@ -288,7 +288,7 @@ pub async fn extract_zip_with_cancellation(
         Ok(archive) => archive,
         Err(e) => {
             let error_msg = format!("The ZIP file is corrupted or invalid: {}", e);
-            println!("{}", error_msg);
+            tracing::info!("{}", error_msg);
             let _ = app_handle.emit(
                 "extraction-error",
                 ExtractionError {
@@ -309,7 +309,7 @@ pub async fn extract_zip_with_cancellation(
     // Verify the archive is intact by checking for CRC errors
     if let Err(e) = verify_archive(&mut archive) {
         let error_msg = format!("ZIP archive failed verification: {}", e);
-        println!("{}", error_msg);
+        tracing::info!("{}", error_msg);
         let _ = app_handle.emit(
             "extraction-error",
             ExtractionError {
@@ -413,7 +413,7 @@ pub async fn extract_zip_with_cancellation(
     }
 
     // Emit extraction completed event
-    println!("Extraction completed for {}", mod_name);
+    tracing::info!("Extraction completed for {}", mod_name);
     app_handle
         .emit(
             "extraction-status",

@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 
 pub fn read_mod_metadata(mod_dir: &Path) -> Result<Mod, ModError> {
-    println!("Reading metadata for directory: {:?}", mod_dir);
+    tracing::info!("Reading metadata for directory: {:?}", mod_dir);
     let name = mod_dir
         .file_name()
         .and_then(|n| n.to_str())
@@ -22,15 +22,15 @@ pub fn read_mod_metadata(mod_dir: &Path) -> Result<Mod, ModError> {
         .trim()
         .to_string();
 
-    println!("Found sideloaded mod: {} ({})", name, version);
+    tracing::info!("Found sideloaded mod: {} ({})", name, version);
     Ok(Mod::new_sideloaded(name, version, description))
 }
 
 pub fn scan_sideload_directory(sideload_path: &str) -> Result<Category, ModError> {
-    println!("Scanning sideload directory: {}", sideload_path);
+    tracing::info!("Scanning sideload directory: {}", sideload_path);
     let sideload_dir = Path::new(sideload_path);
     if !sideload_dir.exists() {
-        println!("Sideload directory does not exist");
+        tracing::info!(?sideload_dir, "Sideload directory does not exist");
         return Ok(Category::new_sideloaded(Vec::new()));
     }
 
@@ -43,15 +43,14 @@ pub fn scan_sideload_directory(sideload_path: &str) -> Result<Category, ModError
         if path.is_dir() {
             match read_mod_metadata(&path) {
                 Ok(mod_info) => {
-                    println!("Successfully read metadata for {:?}", path);
+                    tracing::info!("Successfully read metadata for {:?}", path);
                     sideloaded_mods.push(mod_info);
                 }
-                Err(e) => eprintln!("Failed to read metadata for {:?}: {}", path, e),
+                Err(e) => tracing::warn!("Failed to read metadata for {:?}: {}", path, e),
             }
         }
     }
 
-    println!("Found {} sideloaded mods", sideloaded_mods.len());
+    tracing::info!("Found {} sideloaded mods", sideloaded_mods.len());
     Ok(Category::new_sideloaded(sideloaded_mods))
 }
-

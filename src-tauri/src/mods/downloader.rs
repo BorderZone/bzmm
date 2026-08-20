@@ -24,6 +24,7 @@ impl ModDownloader {
         Ok(self.client.get(url).send().await?.text().await?)
     }
 
+    #[tracing::instrument(skip(self, app_handle))]
     pub async fn download_mod(
         &self,
         app_handle: tauri::AppHandle,
@@ -33,7 +34,7 @@ impl ModDownloader {
     ) -> Result<(), ModError> {
         // Function to emit error event
         let emit_error = |e: &ModError| {
-            println!("Download error for {}: {:?}", mod_name, e);
+            tracing::warn!("Download error for {}: {:?}", mod_name, e);
             let _ = app_handle.emit(
                 "download-error",
                 serde_json::json!({
@@ -44,9 +45,9 @@ impl ModDownloader {
         };
 
         // Validate URL
-        println!("Download started for {} from URL: '{}'", mod_name, url);
+        tracing::info!("Download started for {} from URL: '{}'", mod_name, url);
         if url.is_empty() || !url.starts_with("http") {
-            println!("Invalid URL for {}: '{}'", mod_name, url);
+            tracing::warn!("Invalid URL for {}: '{}'", mod_name, url);
             let err = ModError::InvalidUrl(format!("Invalid URL provided: {}", url));
             emit_error(&err);
             return Err(err);
@@ -63,7 +64,7 @@ impl ModDownloader {
         let resp = match self.client.head(url).send().await {
             Ok(r) => r,
             Err(e) => {
-                println!("HEAD request failed for {}: {}", mod_name, e);
+                tracing::error!("HEAD request failed for {}: {}", mod_name, e);
                 let err = ModError::RequestError(e);
                 emit_error(&err);
                 return Err(err);
@@ -77,7 +78,7 @@ impl ModDownloader {
             .and_then(|ct_len| ct_len.parse().ok())
             .unwrap_or(0u64);
 
-        println!("Starting download of {} bytes for {}", total_size, mod_name);
+        tracing::info!("Starting download of {} bytes for {}", total_size, mod_name);
 
         // Now make the actual download request
         let res = match self.client.get(url).send().await {
@@ -89,7 +90,7 @@ impl ModDownloader {
                         .text()
                         .await
                         .unwrap_or_else(|_| format!("HTTP Error: {}", status));
-                    println!("HTTP error for {}: {} - {}", mod_name, status, error_text);
+                    tracing::error!("HTTP error for {}: {} - {}", mod_name, status, error_text);
                     let err = ModError::HttpError(format!(
                         "Server returned error: {} - {}",
                         status, error_text
@@ -100,7 +101,7 @@ impl ModDownloader {
                 r
             }
             Err(e) => {
-                println!("GET request failed for {}: {}", mod_name, e);
+                tracing::error!("GET request failed for {}: {}", mod_name, e);
                 let err = ModError::RequestError(e);
                 emit_error(&err);
                 return Err(err);
@@ -114,7 +115,7 @@ impl ModDownloader {
         let mut file = match tokio::fs::File::create(path).await {
             Ok(f) => f,
             Err(e) => {
-                println!("Failed to create file {}: {}", path.display(), e);
+                tracing::error!("Failed to create file {}: {}", path.display(), e);
                 let err = ModError::IoError(e);
                 emit_error(&err);
                 return Err(err);
@@ -123,12 +124,12 @@ impl ModDownloader {
 
         use tokio::io::AsyncWriteExt;
 
-        println!("Downloading to path: {}", path.display());
+        tracing::info!("Downloading to path: {}", path.display());
         while let Some(chunk) = stream.next().await {
             let chunk = match chunk {
                 Ok(c) => c,
                 Err(e) => {
-                    println!("Download stream error for {}: {}", mod_name, e);
+                    tracing::error!("Download stream error for {}: {}", mod_name, e);
                     let err = ModError::RequestError(e);
                     emit_error(&err);
                     return Err(err);
@@ -136,7 +137,7 @@ impl ModDownloader {
             };
 
             if let Err(e) = file.write_all(&chunk).await {
-                println!("Failed to write chunk to file {}: {}", path.display(), e);
+                tracing::error!("Failed to write chunk to file {}: {}", path.display(), e);
                 let err = ModError::IoError(e);
                 emit_error(&err);
                 return Err(err);
@@ -169,14 +170,14 @@ impl ModDownloader {
 
         // Ensure file is flushed and closed correctly
         if let Err(e) = file.flush().await {
-            println!("Failed to flush file {}: {}", path.display(), e);
+            tracing::error!("Failed to flush file {}: {}", path.display(), e);
             let err = ModError::IoError(e);
             emit_error(&err);
             return Err(err);
         }
 
         if let Err(e) = file.sync_all().await {
-            println!("Failed to sync file {}: {}", path.display(), e);
+            tracing::error!("Failed to sync file {}: {}", path.display(), e);
             // Log but continue, as this is not critical
         }
 
@@ -204,7 +205,7 @@ impl ModDownloader {
         let metadata = match tokio::fs::metadata(path).await {
             Ok(m) => m,
             Err(e) => {
-                println!("Failed to get metadata for {}: {}", path.display(), e);
+                tracing::error!("Failed to get metadata for {}: {}", path.display(), e);
                 let err = ModError::IoError(e);
                 emit_error(&err);
                 return Err(err);
@@ -212,7 +213,7 @@ impl ModDownloader {
         };
 
         if metadata.len() == 0 {
-            println!("Downloaded file is empty: {}", path.display());
+            tracing::error!("Downloaded file is empty: {}", path.display());
             let err = ModError::IoError(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
                 "Downloaded file is empty",
@@ -222,7 +223,7 @@ impl ModDownloader {
         }
 
         // Emit completion event
-        println!(
+        tracing::info!(
             "Download completed for {} - File size: {} bytes",
             mod_name,
             metadata.len()
@@ -238,17 +239,18 @@ impl ModDownloader {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self, app_handle))]
     pub async fn download_mod_with_cancellation(
         &self,
         app_handle: tauri::AppHandle,
         url: &str,
         path: &std::path::Path,
         mod_name: &str,
-        cancel_token: CancellationToken,
+        cancel_token: &CancellationToken,
     ) -> Result<(), ModError> {
         // Function to emit error event
         let emit_error = |e: &ModError| {
-            println!("Download error for {}: {:?}", mod_name, e);
+            tracing::error!("Download error for {}: {:?}", mod_name, e);
             let _ = app_handle.emit(
                 "download-error",
                 serde_json::json!({
@@ -262,14 +264,14 @@ impl ModDownloader {
         if cancel_token.is_cancelled() {
             return Err(ModError::IoError(std::io::Error::new(
                 std::io::ErrorKind::Interrupted,
-                "Download was cancelled"
+                "Download was cancelled",
             )));
         }
 
         // Validate URL
-        println!("Download started for {} from URL: '{}'", mod_name, url);
+        tracing::debug!("Download started for {} from URL: '{}'", mod_name, url);
         if url.is_empty() || !url.starts_with("http") {
-            println!("Invalid URL for {}: '{}'", mod_name, url);
+            tracing::error!("Invalid URL for {}: '{}'", mod_name, url);
             let err = ModError::InvalidUrl(format!("Invalid URL provided: {}", url));
             emit_error(&err);
             return Err(err);
@@ -286,7 +288,7 @@ impl ModDownloader {
         let resp = match self.client.head(url).send().await {
             Ok(r) => r,
             Err(e) => {
-                println!("HEAD request failed for {}: {}", mod_name, e);
+                tracing::error!("HEAD request failed for {}: {}", mod_name, e);
                 let err = ModError::RequestError(e);
                 emit_error(&err);
                 return Err(err);
@@ -300,13 +302,13 @@ impl ModDownloader {
             .and_then(|ct_len| ct_len.parse().ok())
             .unwrap_or(0u64);
 
-        println!("Starting download of {} bytes for {}", total_size, mod_name);
+        tracing::debug!("Starting download of {} bytes for {}", total_size, mod_name);
 
         // Check if cancelled before main download
         if cancel_token.is_cancelled() {
             return Err(ModError::IoError(std::io::Error::new(
                 std::io::ErrorKind::Interrupted,
-                "Download was cancelled"
+                "Download was cancelled",
             )));
         }
 
@@ -320,7 +322,7 @@ impl ModDownloader {
                         .text()
                         .await
                         .unwrap_or_else(|_| format!("HTTP Error: {}", status));
-                    println!("HTTP error for {}: {} - {}", mod_name, status, error_text);
+                    tracing::info!("HTTP error for {}: {} - {}", mod_name, status, error_text);
                     let err = ModError::HttpError(format!(
                         "Server returned error: {} - {}",
                         status, error_text
@@ -331,7 +333,7 @@ impl ModDownloader {
                 r
             }
             Err(e) => {
-                println!("GET request failed for {}: {}", mod_name, e);
+                tracing::warn!("GET request failed for {}: {}", mod_name, e);
                 let err = ModError::RequestError(e);
                 emit_error(&err);
                 return Err(err);
@@ -345,7 +347,7 @@ impl ModDownloader {
         let mut file = match tokio::fs::File::create(path).await {
             Ok(f) => f,
             Err(e) => {
-                println!("Failed to create file {}: {}", path.display(), e);
+                tracing::info!("Failed to create file {}: {}", path.display(), e);
                 let err = ModError::IoError(e);
                 emit_error(&err);
                 return Err(err);
@@ -354,20 +356,20 @@ impl ModDownloader {
 
         use tokio::io::AsyncWriteExt;
 
-        println!("Downloading to path: {}", path.display());
+        tracing::debug!("Downloading to path: {}", path.display());
         while let Some(chunk) = stream.next().await {
             // Check if cancelled during download
             if cancel_token.is_cancelled() {
                 return Err(ModError::IoError(std::io::Error::new(
                     std::io::ErrorKind::Interrupted,
-                    "Download was cancelled"
+                    "Download was cancelled",
                 )));
             }
 
             let chunk = match chunk {
                 Ok(c) => c,
                 Err(e) => {
-                    println!("Download stream error for {}: {}", mod_name, e);
+                    tracing::error!("Download stream error for {}: {}", mod_name, e);
                     let err = ModError::RequestError(e);
                     emit_error(&err);
                     return Err(err);
@@ -375,7 +377,7 @@ impl ModDownloader {
             };
 
             if let Err(e) = file.write_all(&chunk).await {
-                println!("Failed to write chunk to file {}: {}", path.display(), e);
+                tracing::error!("Failed to write chunk to file {}: {}", path.display(), e);
                 let err = ModError::IoError(e);
                 emit_error(&err);
                 return Err(err);
@@ -410,20 +412,20 @@ impl ModDownloader {
         if cancel_token.is_cancelled() {
             return Err(ModError::IoError(std::io::Error::new(
                 std::io::ErrorKind::Interrupted,
-                "Download was cancelled"
+                "Download was cancelled",
             )));
         }
 
         // Ensure file is flushed and closed correctly
         if let Err(e) = file.flush().await {
-            println!("Failed to flush file {}: {}", path.display(), e);
+            tracing::error!("Failed to flush file {}: {}", path.display(), e);
             let err = ModError::IoError(e);
             emit_error(&err);
             return Err(err);
         }
 
         if let Err(e) = file.sync_all().await {
-            println!("Failed to sync file {}: {}", path.display(), e);
+            tracing::error!("Failed to sync file {}: {}", path.display(), e);
             // Log but continue, as this is not critical
         }
 
@@ -451,7 +453,7 @@ impl ModDownloader {
         let metadata = match tokio::fs::metadata(path).await {
             Ok(m) => m,
             Err(e) => {
-                println!("Failed to get metadata for {}: {}", path.display(), e);
+                tracing::error!("Failed to get metadata for {}: {}", path.display(), e);
                 let err = ModError::IoError(e);
                 emit_error(&err);
                 return Err(err);
@@ -459,7 +461,7 @@ impl ModDownloader {
         };
 
         if metadata.len() == 0 {
-            println!("Downloaded file is empty: {}", path.display());
+            tracing::error!("Downloaded file is empty: {}", path.display());
             let err = ModError::IoError(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
                 "Downloaded file is empty",
@@ -469,7 +471,7 @@ impl ModDownloader {
         }
 
         // Emit completion event
-        println!(
+        tracing::debug!(
             "Download completed for {} - File size: {} bytes",
             mod_name,
             metadata.len()
@@ -483,19 +485,23 @@ impl ModDownloader {
         Ok(())
     }
 
-    pub async fn fetch_and_parse_mods(&self, url: &str) -> Result<(ModsFile, Option<std::path::PathBuf>), ModError> {
+    #[tracing::instrument(skip(self))]
+    pub async fn fetch_and_parse_mods(
+        &self,
+        url: &str,
+    ) -> Result<(ModsFile, Option<std::path::PathBuf>), ModError> {
         let xml_content = self.fetch_mod_list(url).await?;
         let mods_file = ModParser::parse_mod_list(&xml_content)?;
-        
+
         // Save the successful XML to cache
         let cache_path = match super::xml_cache::XmlCache::save_xml(url, &xml_content) {
             Ok(path) => Some(path),
             Err(e) => {
-                println!("Warning: Failed to cache XML: {}", e);
+                tracing::warn!(url, "Failed to cache XML: {}", e);
                 None
             }
         };
-        
+
         Ok((mods_file, cache_path))
     }
 }
