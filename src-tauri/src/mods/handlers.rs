@@ -4,34 +4,18 @@ use super::mod_download::is_mod_successfully_downloaded;
 use super::parser::ModParser;
 use super::sideload::scan_sideload_directory;
 use super::types::ModsResult;
-use crate::settings;
+use crate::state::AppState;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-#[tracing::instrument]
+#[tracing::instrument(skip(state), fields(settings))]
 #[tauri::command]
-pub async fn get_enabled_mods(profile_name: &str) -> Result<Vec<String>, String> {
-    let settings = settings::Settings::load()?;
-
-    // Check enabled mods in the download folder
-    let mut enabled_mods = get_enabled_downloaded_mods(&settings, profile_name)?;
-
-    // Check sideloaded mods
-    {
-        let mut enabled_sideload_mods =
-            check_directory_for_enabled_mods(settings.sideload_path.as_ref(), profile_name)?;
-        enabled_mods.append(&mut enabled_sideload_mods);
-    }
-
-    Ok(enabled_mods)
-}
-
-#[inline]
-fn get_enabled_downloaded_mods(
-    settings: &settings::Settings,
-    profile_name: &str,
+pub async fn get_enabled_mods(
+    state: tauri::State<'_, AppState>,
+    profile_name: String,
 ) -> Result<Vec<String>, String> {
+    let settings = state.settings_snapshot()?;
     let base_downloads_dir = PathBuf::from(&settings.download_path);
 
     // Find the profile to get the repo_url
@@ -54,7 +38,7 @@ fn get_enabled_downloaded_mods(
         xml_specific_path.display()
     );
 
-    check_directory_for_enabled_mods(&xml_specific_path, profile_name)
+    check_directory_for_enabled_mods(&xml_specific_path, &profile_name)
 }
 
 #[inline]
@@ -83,10 +67,13 @@ fn check_directory_for_enabled_mods(
     Ok(enabled_mods)
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip(state), fields(settings))]
 #[tauri::command]
-pub async fn get_mods(profile_index: usize) -> Result<ModsResult, String> {
-    let mut settings = settings::Settings::load()?;
+pub async fn get_mods(
+    state: tauri::State<'_, AppState>,
+    profile_index: usize,
+) -> Result<ModsResult, String> {
+    let settings = state.settings_snapshot()?;
 
     if profile_index >= settings.profiles.len() {
         tracing::warn!(profile_index, "Profile index out of bounds");
@@ -111,11 +98,10 @@ pub async fn get_mods(profile_index: usize) -> Result<ModsResult, String> {
         Ok((mods_file, cache_path)) => {
             // Save the cache path if available
             if let Some(path) = cache_path {
-                if let Err(e) =
-                    super::xml_cache::update_cache_path_in_settings(&mut settings, &url, &path)
-                {
-                    tracing::warn!(error = ?e, "Failed to update cache path in setting");
-                }
+                match super::xml_cache::update_cache_path_in_settings(settings, &url, &path) {
+                    Ok(settings) => state.update_settings(&settings)?,
+                    Err(e) => tracing::warn!(error = ?e, "Failed to update cache path in setting"),
+                };
             }
 
             // Pass the repo URL to check_for_updates
@@ -221,6 +207,8 @@ pub async fn get_mods(profile_index: usize) -> Result<ModsResult, String> {
         .flat_map(|cat| cat.mods.iter().map(|m| m.name.clone()))
         .collect();
 
+    let settings = state.settings_snapshot()?;
+
     // Scan for deprecated mods within the specific XML source directory
     if !settings.download_path.is_empty() {
         // Calculate the XML-specific path for deprecation scanning
@@ -264,10 +252,10 @@ pub async fn get_mods(profile_index: usize) -> Result<ModsResult, String> {
     Ok(ModsResult { categories, error })
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip(state), fields(settings))]
 #[tauri::command]
-pub async fn get_downloaded_mods() -> Result<Vec<String>, String> {
-    let settings = settings::Settings::load()?;
+pub async fn get_downloaded_mods(state: tauri::State<'_, AppState>) -> Result<Vec<String>, String> {
+    let settings = state.settings_snapshot()?;
     let base_downloads_dir = PathBuf::from(&settings.download_path);
 
     let mut downloaded_mods = Vec::new();

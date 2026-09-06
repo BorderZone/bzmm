@@ -1,5 +1,6 @@
 use super::parser::ModParser;
 use super::types::{ModError, ModsFile};
+use crate::settings::Settings;
 use directories::ProjectDirs;
 use std::fs;
 use std::io;
@@ -74,16 +75,16 @@ impl XmlCache {
 
 /// Add cache path to settings
 pub fn update_cache_path_in_settings(
-    settings: &mut crate::settings::Settings,
+    settings: Settings,
     url: &str,
     cache_path: &Path,
-) -> Result<(), String> {
+) -> Result<Settings, String> {
     // Convert cache_path to string
     let cache_path_str = cache_path.to_string_lossy().to_string();
+    let mut settings = settings;
 
     // Find index for this URL
     let index = settings.profiles.iter().position(|p| p.repo_url == url);
-
     if let Some(index) = index {
         // Ensure the cached_xml_paths vector has enough elements
         while settings.cached_xml_paths.len() <= index {
@@ -92,10 +93,6 @@ pub fn update_cache_path_in_settings(
 
         // Update the cache path
         settings.cached_xml_paths[index] = cache_path_str;
-
-        // Save settings
-        settings.save()?;
     }
-
-    Ok(())
+    Ok(settings)
 }

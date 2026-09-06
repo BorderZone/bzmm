@@ -4,13 +4,17 @@
 mod logging;
 mod mods;
 mod settings;
+mod state;
 
 use mods::handlers::get_enabled_mods;
 use mods::{
     cancel_download, delete_mod, disable_mod, download_mod, enable_mod, get_downloaded_mods,
     get_mods, queue_download, update_mod,
 };
-use settings::{delete_profile, get_app_version, get_settings, update_profile, update_settings};
+use settings::{
+    delete_profile, get_app_version, get_settings, update_profile, update_settings, Settings,
+};
+use state::AppState;
 
 use crate::logging::init_logging;
 
@@ -21,6 +25,9 @@ fn main() {
             tracing::info!("App Starting up");
             Ok(())
         })
+        .manage(AppState::new(
+            Settings::load().expect("Settings failed to load"),
+        ))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![

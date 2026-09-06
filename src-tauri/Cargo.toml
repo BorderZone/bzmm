@@ -5,6 +5,7 @@ description = "Borderzone Mod Manager"
 authors = ["Borderzone"]
 edition = "2021"
 
+
 [lib]
 name = "bzmm_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]

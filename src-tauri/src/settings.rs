@@ -1,23 +1,24 @@
+use crate::state::AppState;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Profile {
     pub name: String,
     pub dcs_path: String,
     pub repo_url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub enum DarkMode {
     System,
     Light,
     Dark,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Settings {
     pub dark_mode: DarkMode,
     pub download_path: String,
@@ -37,6 +38,12 @@ pub struct SettingsUpdate {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AppVersion {
     pub version: String,
+}
+
+impl AsRef<Settings> for Settings {
+    fn as_ref(&self) -> &Settings {
+        self
+    }
 }
 
 impl Default for Settings {
@@ -100,11 +107,11 @@ impl Settings {
     }
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip(state), fields(settings))]
 #[tauri::command]
-pub async fn get_settings() -> Result<Settings, String> {
+pub async fn get_settings(state: tauri::State<'_, AppState>) -> Result<Settings, String> {
     tracing::info!("Getting settings");
-    Settings::load()
+    state.settings_snapshot()
 }
 
 #[tracing::instrument]
@@ -115,46 +122,65 @@ pub async fn get_app_version() -> Result<AppVersion, String> {
     })
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip(state), fields(settings))]
 #[tauri::command]
-pub async fn update_settings(update: SettingsUpdate) -> Result<Settings, String> {
-    let mut settings = Settings::load()?;
+pub async fn update_settings(
+    state: tauri::State<'_, AppState>,
+    update: SettingsUpdate,
+) -> Result<Settings, String> {
+    let updated = {
+        let mut settings = state.write_settings()?;
 
-    match update.key.as_str() {
-        "download_path" => settings.download_path = update.value,
-        "sideload_path" => settings.sideload_path = update.value,
-        _ => return Err("Invalid settings key".to_string()),
-    }
+        match update.key.as_str() {
+            "download_path" => settings.download_path = update.value,
+            "sideload_path" => settings.sideload_path = update.value,
+            _ => return Err("Invalid settings key".to_string()),
+        }
+        settings.clone()
+    };
 
-    settings.save()?;
-    Ok(settings)
+    updated.save()?;
+    Ok(updated)
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip(state), fields(settings))]
 #[tauri::command]
-pub async fn update_profile(index: usize, profile: Profile) -> Result<Settings, String> {
-    let mut settings = Settings::load()?;
+pub async fn update_profile(
+    state: tauri::State<'_, AppState>,
+    index: usize,
+    profile: Profile,
+) -> Result<Settings, String> {
+    let updated = {
+        let mut settings = state.write_settings()?;
 
-    if index >= settings.profiles.len() {
-        settings.profiles.push(profile);
-    } else {
-        settings.profiles[index] = profile;
-    }
+        if index >= settings.profiles.len() {
+            settings.profiles.push(profile);
+        } else {
+            settings.profiles[index] = profile;
+        }
+        settings.clone()
+    };
 
-    settings.save()?;
-    Ok(settings)
+    updated.save()?;
+    Ok(updated)
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip(state), fields(settings))]
 #[tauri::command]
-pub async fn delete_profile(index: usize) -> Result<Settings, String> {
-    let mut settings = Settings::load()?;
+pub async fn delete_profile(
+    state: tauri::State<'_, AppState>,
+    index: usize,
+) -> Result<Settings, String> {
+    let updated = {
+        let mut settings = state.write_settings()?;
 
-    if index >= settings.profiles.len() {
-        return Err("Profile index out of bounds".to_string());
-    }
+        if index >= settings.profiles.len() {
+            return Err("Profile index out of bounds".to_string());
+        }
 
-    settings.profiles.remove(index);
-    settings.save()?;
-    Ok(settings)
+        settings.profiles.remove(index);
+        settings.clone()
+    };
+    updated.save()?;
+    Ok(updated)
 }
